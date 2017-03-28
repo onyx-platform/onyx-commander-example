@@ -3,8 +3,10 @@
 
 (s/def :transaction/id uuid?)
 
-(s/def :account/from string?)
+(s/def :account/id string?)
 
-(s/def :account/to string?)
+(s/def :account/from :account/id)
+
+(s/def :account/to :account/id)
 
 (s/def :account/amount integer?)

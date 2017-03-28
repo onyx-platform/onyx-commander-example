@@ -2,11 +2,8 @@
   (:require [clojure.spec :as s]
             [onyx-commander-example.spec.base-specs :refer [command-action]]))
 
-(s/def :account/from string?)
-
-(s/def :account/to string?)
-
-(s/def :account/amount integer?)
+(s/def :command.create-account/data
+  (s/keys :req [:account/id]))
 
 (s/def :command.deposit-money/data
   (s/keys :req [:account/to :account/amount]))
@@ -16,6 +13,13 @@
 
 (s/def :command.transfer-money/data
   (s/keys :req [:account/from :account/to :account/amount]))
+
+(defmethod command-action :create-account
+  [_]
+  (s/keys :req [:command/id
+                :command/action
+                :command/timestamp
+                :command.create-account/data]))
 
 (defmethod command-action :deposit-money
   [_]

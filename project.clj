@@ -5,7 +5,12 @@
   :dependencies [[org.clojure/clojure "1.9.0-alpha14"]
                  [org.clojure/tools.cli "0.3.5"]
                  [org.onyxplatform/onyx "0.10.0-beta9"]
-                 [org.onyxplatform/lib-onyx "0.10.0.0"]]
+                 [org.onyxplatform/lib-onyx "0.10.0.0"]
+                 [com.datomic/datomic-free "0.9.5407"
+                  :exclusions [org.slf4j/log4j-over-slf4j
+                               com.google.guava/guava
+                               org.slf4j/slf4j-nop org.slf4j/slf4j-api]]
+                 [org.apache.kafka/kafka_2.11 "0.10.1.1" :exclusions [org.slf4j/slf4j-log4j12]]]
   :source-paths ["src"]
   :profiles {:dev {:jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
                    :global-vars {*assert* true}

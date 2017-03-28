@@ -7,15 +7,9 @@
     :db.install/_partition :db.part/db}
 
    {:db/id (d/tempid :db.part/db)
-    :db/ident :user/account
-    :db/valueType :db.type/ref
-    :db/cardinality :db.cardinality/one
-    :db/isComponent true
-    :db.install/_attribute :db.part/db}
-
-   {:db/id (d/tempid :db.part/db)
     :db/ident :account/id
-    :db/valueType :db.type/uuid
+    :db/valueType :db.type/string
+    :db/unique :db.unique/identity
     :db/cardinality :db.cardinality/one
     :db.install/_attribute :db.part/db}
 

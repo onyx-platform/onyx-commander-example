@@ -5,6 +5,8 @@
   :dependencies [[org.clojure/clojure "1.9.0-alpha14"]
                  [org.clojure/tools.cli "0.3.5"]
                  [org.onyxplatform/onyx "0.10.0-beta9"]
+                 [org.onyxplatform/onyx-datomic "0.10.0.0-beta7"]
+                 [org.onyxplatform/onyx-kafka "0.10.0.0-beta9"]
                  [org.onyxplatform/lib-onyx "0.10.0.0"]
                  [com.datomic/datomic-free "0.9.5407"
                   :exclusions [org.slf4j/log4j-over-slf4j

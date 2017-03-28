@@ -1,5 +1,6 @@
 (ns onyx-commander-example.impl
-  (:require [onyx.windowing.aggregation :refer [set-value-aggregation-apply-log]]))
+  (:require [onyx.windowing.aggregation :refer [set-value-aggregation-apply-log]]
+            [datomic.api :as d]))
 
 (defn init [window]
   {})
@@ -43,3 +44,21 @@
    :aggregation/create-state-update aggregation
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn super-aggregation})
+
+(defn sync-state [event window trigger state-event state])
+
+(defn balances->segments [event window trigger state-event state]
+  {:tx
+   (reduce-kv
+    (fn [result account-id {:keys [balance]}]
+      (conj result {:db/id (d/tempid :db.part/user)
+                    :account/id account-id
+                    :account/balance balance}))
+    []
+    state)})
+
+(defn deserialize-kafka-message [bytes]
+  (read-string (String. bytes "UTF-8")))
+
+(defn transaction? [event old new all-new]
+  (contains? new :tx))

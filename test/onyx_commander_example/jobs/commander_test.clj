@@ -23,16 +23,10 @@
 
 (def kafka-brokers "192.168.99.100:9092")
 
-(def commands-topic "commands")
-
-(def events-topic "events")
-
 (defn now []
   (java.util.Date.))
 
-(def transaction-id (UUID/randomUUID))
-
-(def commands
+(defn build-commands [transaction-id]
   [{:command/id (UUID/randomUUID)
     :command/action :create-account
     :command/timestamp (now)
@@ -100,24 +94,16 @@
     (d/transact conn schema)
     conn))
 
-(defn initialize-kafka! []
-  (delete-topic! kafka-zookeeper commands-topic)
-  (delete-topic! kafka-zookeeper events-topic)
-
-  (make-topic! kafka-zookeeper commands-topic)
-  (make-topic! kafka-zookeeper events-topic)
-
-  (write-commands! kafka-brokers commands-topic commands))
-
-;; Run me once.
-;; (initialize-kafka!)
-
 (deftest commander-test
   (testing "Test a sequence of commands"
     (let [datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))
           datomic-conn (create-datomic-db! datomic-uri da/schema)
+          commands-topic (str "commands-" (java.util.UUID/randomUUID))
+          events-topic (str "events-" (java.util.UUID/randomUUID))
           consumer (g/consumer kafka-brokers "onyx-consumer")
+          transaction-id (UUID/randomUUID)
           tenancy-id (UUID/randomUUID)
+          commands (build-commands transaction-id)
           config (load-config "dev-config.edn")
           env-config (assoc (:env-config config) :onyx/tenancy-id tenancy-id)
           peer-config (assoc (:peer-config config) :onyx/tenancy-id tenancy-id)
@@ -128,6 +114,11 @@
                :windows c/windows
                :triggers c/triggers
                :task-scheduler :onyx.task-scheduler/balanced}]
+
+      (make-topic! kafka-zookeeper commands-topic)
+      (make-topic! kafka-zookeeper events-topic)
+      (write-commands! kafka-brokers commands-topic commands)
+
       (g/assign! consumer events-topic 0)
       (g/seek-to! consumer :beginning events-topic 0)
       (with-test-env [test-env [3 env-config peer-config]]
@@ -143,4 +134,6 @@
           (is (= 80 (:account/balance (d/pull db [:account/id :account/balance] [:account/id "123"]))))
           (is (= 110 (:account/balance (d/pull db [:account/id :account/balance] [:account/id "456"])))))
 
-        (.close consumer)))))
+        (.close consumer)
+        (delete-topic! kafka-zookeeper commands-topic)
+        (delete-topic! kafka-zookeeper events-topic)))))

@@ -8,9 +8,13 @@
 (defn now []
   (java.util.Date.))
 
+;; Initial window state has no accounts and no events to send.
 (defn init [window]
   {:accounts {}
    :events []})
+
+;; Commander functions. Takes a segment and a piece of state, returns
+;; an updated version of the state.
 
 (defn create-account [{:keys [:command.create-account/data] :as segment} state]
   (let [{:keys [account/id]} data]
@@ -60,6 +64,8 @@
     :withdraw-money (withdraw-money segment state)
     :transfer-money (transfer-money segment state)))
 
+;; Probably not needed unless you're using Session windows,
+;; but implemented for completeness.
 (defn super-aggregation [window state-1 state-2]
   (reduce-kv
    (fn [result k v]
@@ -80,10 +86,15 @@
 (defn discarding-events-apply-state-update [trigger state entry]
   (dissoc state :events))
 
+;; Implements a custom refinement strategy. When triggers are fired,
+;; we maintain all account information, but throw away events because
+;; we send them to the downstream task to eventually be put into Kafka.
 (def discarding-events
   {:refinement/create-state-update discarding-events-create-state-update 
    :refinement/apply-state-update discarding-events-apply-state-update})
 
+;; When a trigger fires, we send a segment to the downstream task
+;; to update Datomic with all the new account balances.
 (defn transform-window-state [event window trigger state-event state]
   (doseq [event (:events state)]
     (when-let [errors (s/explain-data :commander/event event)]
@@ -122,6 +133,8 @@
   (.close (:commander/producer event))
   {})
 
+;; After Datomic is updated with new account balances,
+;; we send read receipts back to the Kafka events topic.
 (def send-events
   {:lifecycle/before-task-start initialize-producer
    :lifecycle/after-batch forward-events

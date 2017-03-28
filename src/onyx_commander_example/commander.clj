@@ -31,6 +31,7 @@
     :datomic/uri datomic-uri
     :datomic/partition :example/commander}])
 
+;; Only send segments to the last task if they are emitted from the trigger.
 (def flow-conditions
   [{:flow/from :process-commands
     :flow/to [:update-materialized-view]
@@ -44,17 +45,22 @@
    {:lifecycle/task :update-materialized-view
     :lifecycle/calls :onyx.plugin.datomic/write-bulk-tx-async-calls}
 
+   ;; Supply the Kafka broker and partition to send read receipts after
+   ;; updating Datomic.
    {:lifecycle/task :update-materialized-view
     :lifecycle/calls :onyx-commander-example.impl/send-events
     :kafka/brokers brokers
     :commander/event-topic event-topic}])
 
+;; The specified aggregation performs each of the commands and maintains
+;; exactly-once semantics on the window.
 (def windows
   [{:window/id :update-state
     :window/task :process-commands
     :window/type :global
     :window/aggregation :onyx-commander-example.impl/commands}])
 
+;; Periodically send window data to the materialized view to be updated.
 (def triggers
   [{:trigger/id :flush-state
     :trigger/window-id :update-state

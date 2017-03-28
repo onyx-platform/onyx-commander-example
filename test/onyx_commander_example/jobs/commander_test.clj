@@ -19,13 +19,19 @@
            [org.apache.kafka.common.errors UnknownTopicOrPartitionException]
            [kafka.common TopicAlreadyMarkedForDeletionException]))
 
-(def kafka-zookeeper "192.168.99.100:2181")
+;; Change me if you're Docker IP is different.
+(def docker-ip "127.0.0.1")
 
-(def kafka-brokers "192.168.99.100:9092")
+(def kafka-zookeeper (format "%s:2181" docker-ip))
+
+(def kafka-brokers (format "%s:9092" docker-ip))
 
 (defn now []
   (java.util.Date.))
 
+;; Create an initial set of commands. We assign a particular ID
+;; to the last command so we can wait for a read receipt of it having
+;; been processed.
 (defn build-commands [transaction-id]
   [{:command/id (UUID/randomUUID)
     :command/action :create-account
@@ -94,6 +100,10 @@
     (d/transact conn schema)
     conn))
 
+;; Run a sequence of commands through Onyx. Waits for
+;; the last command to generate an event, after which
+;; we can query the Datomic materialized view for account
+;; information.
 (deftest commander-test
   (testing "Test a sequence of commands"
     (let [datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))
@@ -123,7 +133,10 @@
       (g/seek-to! consumer :beginning events-topic 0)
       (with-test-env [test-env [3 env-config peer-config]]
         (onyx.api/submit-job peer-config job)
-        
+
+        ;; Read until we get a receipt for transferring money.
+        ;; Identified by an event with a parent ID matching the
+        ;; initiating command.
         (loop []
           (let [records (map (comp read-string :value) (g/poll consumer))
                 parents (map :event/parent-id records)]

@@ -37,6 +37,11 @@
     :command.create-account/data {:account/id "123"}}
 
    {:command/id (UUID/randomUUID)
+    :command/action :create-account
+    :command/timestamp (now)
+    :command.create-account/data {:account/id "456"}}
+
+   {:command/id (UUID/randomUUID)
     :command/action :deposit-money
     :command/timestamp (now)
     :command.deposit-money/data {:account/to "123"
@@ -51,8 +56,21 @@
    {:command/id (UUID/randomUUID)
     :command/action :deposit-money
     :command/timestamp (now)
+    :command.deposit-money/data {:account/to "456"
+                                 :account/amount 100}}
+
+   {:command/id (UUID/randomUUID)
+    :command/action :deposit-money
+    :command/timestamp (now)
     :command.deposit-money/data {:account/to "123"
-                                 :account/amount 70}}])
+                                 :account/amount 70}}
+
+   {:command/id (UUID/randomUUID)
+    :command/action :transfer-money
+    :command/timestamp (now)
+    :command.transfer-money/data {:account/from "123"
+                                  :account/to "456"
+                                  :account/amount 10}}])
 
 (defn make-topic! [zk topic-name]
   (try
@@ -110,4 +128,6 @@
       (with-test-env [test-env [3 env-config peer-config]]
         (clojure.pprint/pprint (onyx.api/submit-job peer-config job))
         (Thread/sleep 4000)
-        (prn (d/pull (d/db datomic-conn) [:account/id :account/balance] [:account/id "123"]))))))
+        (let [db (d/db datomic-conn)]
+          (prn (d/pull db [:account/id :account/balance] [:account/id "123"]))
+          (prn (d/pull db [:account/id :account/balance] [:account/id "456"])))))))

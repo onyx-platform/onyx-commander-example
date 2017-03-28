@@ -1,27 +1,55 @@
 (ns onyx-commander-example.impl
   (:require [onyx.windowing.aggregation :refer [set-value-aggregation-apply-log]]
-            [datomic.api :as d]))
+            [datomic.api :as d])
+  (:import [java.util UUID]))
+
+(defn now []
+  (java.util.Date.))
 
 (defn init [window]
-  {})
+  {:accounts {}
+   :events []})
 
 (defn create-account [{:keys [:command.create-account/data] :as segment} state]
   (let [{:keys [account/id]} data]
-    (assoc-in state [id :balance] 0)))
+    (-> state
+        (assoc-in [:accounts id :balance] 0)
+        (update :events conj {:event/id (UUID/randomUUID)
+                              :event/parent-id (:command/id segment)
+                              :event/action :account-created
+                              :event/timestamp (now)
+                              :event.account-created/data data}))))
 
 (defn deposit-money [{:keys [:command.deposit-money/data] :as segment} state]
   (let [{:keys [account/to account/amount]} data]
-    (update-in state [to :balance] + amount)))
+    (-> state
+        (update-in [to :balance] + amount)
+        (update :events conj {:event/id (UUID/randomUUID)
+                              :event/parent-id (:command/id segment)
+                              :event/action :money-deposited
+                              :event/timestamp (now)
+                              :event.money-deposited/data data}))))
 
 (defn withdraw-money [{:keys [:command.withdraw-money/data] :as segment} state]
   (let [{:keys [account/from account/amount]} data]
-    (update-in state [from :balance] - amount)))
+    (-> state
+        (update-in [from :balance] - amount)
+        (update :events conj {:event/id (UUID/randomUUID)
+                              :event/parent-id (:command/id segment)
+                              :event/action :money-withdrawn
+                              :event/timestamp (now)
+                              :event.money-withdrawn/data data}))))
 
 (defn transfer-money [{:keys [:command.transfer-money/data] :as segment} state]
   (let [{:keys [account/from account/to account/amount]} data]
     (-> state
-        (update-in state [from :balance] - amount)
-        (update-in state [to :balance] + amount))))
+        (update-in [from :balance] - amount)
+        (update-in [to :balance] + amount)
+        (update :events conj {:event/id (UUID/randomUUID)
+                              :event/parent-id (:command/id segment)
+                              :event/action :money-transferredn
+                              :event/timestamp (now)
+                              :event.money-transferred/data data}))))
 
 (defn aggregation [window state segment]
   (condp = (:command/action segment)

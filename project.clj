@@ -10,7 +10,8 @@
                   :exclusions [org.slf4j/log4j-over-slf4j
                                com.google.guava/guava
                                org.slf4j/slf4j-nop org.slf4j/slf4j-api]]
-                 [org.apache.kafka/kafka_2.11 "0.10.1.1" :exclusions [org.slf4j/slf4j-log4j12]]]
+                 [org.apache.kafka/kafka_2.11 "0.10.1.1" :exclusions [org.slf4j/slf4j-log4j12]]
+                 [io.weft/gregor "0.5.1"]]
   :source-paths ["src"]
   :profiles {:dev {:jvm-opts ["-XX:-OmitStackTraceInFastThrow"]
                    :global-vars {*assert* true}

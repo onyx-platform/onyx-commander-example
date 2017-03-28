@@ -1,5 +1,10 @@
 # onyx-commander-example
 
+This project is an example of using the [Commander pattern](https://www.youtube.com/watch?v=B1-gS0oEtYc) with Onyx.
+We read commands from a Kafka topic, process them with Onyx, and produce materialized views using Datomic.
+Commands generate read-receipts named events, which are fed back into Kafka to provide a point of synchronicity
+for the initial caller of a command.
+
 ### Usage
 
 - Spin up ZooKeeper and Kafka with Docker compose: `docker-compose -f docker-compose-single-broker.yml up`

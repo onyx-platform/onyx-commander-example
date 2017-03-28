@@ -1,6 +1,8 @@
 (ns onyx-commander-example.impl
-  (:require [onyx.windowing.aggregation :refer [set-value-aggregation-apply-log]]
-            [datomic.api :as d])
+  (:require [clojure.spec :as s]
+            [onyx.windowing.aggregation :refer [set-value-aggregation-apply-log]]
+            [datomic.api :as d]
+            [gregor.core :as g])
   (:import [java.util UUID]))
 
 (defn now []
@@ -23,7 +25,7 @@
 (defn deposit-money [{:keys [:command.deposit-money/data] :as segment} state]
   (let [{:keys [account/to account/amount]} data]
     (-> state
-        (update-in [to :balance] + amount)
+        (update-in [:accounts to :balance] + amount)
         (update :events conj {:event/id (UUID/randomUUID)
                               :event/parent-id (:command/id segment)
                               :event/action :money-deposited
@@ -33,7 +35,7 @@
 (defn withdraw-money [{:keys [:command.withdraw-money/data] :as segment} state]
   (let [{:keys [account/from account/amount]} data]
     (-> state
-        (update-in [from :balance] - amount)
+        (update-in [:accounts from :balance] - amount)
         (update :events conj {:event/id (UUID/randomUUID)
                               :event/parent-id (:command/id segment)
                               :event/action :money-withdrawn
@@ -43,11 +45,11 @@
 (defn transfer-money [{:keys [:command.transfer-money/data] :as segment} state]
   (let [{:keys [account/from account/to account/amount]} data]
     (-> state
-        (update-in [from :balance] - amount)
-        (update-in [to :balance] + amount)
+        (update-in [:accounts from :balance] - amount)
+        (update-in [:accounts to :balance] + amount)
         (update :events conj {:event/id (UUID/randomUUID)
                               :event/parent-id (:command/id segment)
-                              :event/action :money-transferredn
+                              :event/action :money-transferred
                               :event/timestamp (now)
                               :event.money-transferred/data data}))))
 
@@ -73,9 +75,20 @@
    :aggregation/apply-state-update set-value-aggregation-apply-log
    :aggregation/super-aggregation-fn super-aggregation})
 
-(defn sync-state [event window trigger state-event state])
+(defn discarding-events-create-state-update [trigger state state-event])
 
-(defn balances->segments [event window trigger state-event state]
+(defn discarding-events-apply-state-update [trigger state entry]
+  (dissoc state :events))
+
+(def discarding-events
+  {:refinement/create-state-update discarding-events-create-state-update 
+   :refinement/apply-state-update discarding-events-apply-state-update})
+
+(defn transform-window-state [event window trigger state-event state]
+  (doseq [event (:events state)]
+    (when-let [errors (s/explain-data :commander/event event)]
+      (throw (ex-info "Event failed to conform to spec." {:errors errors}))))
+
   {:tx
    (reduce-kv
     (fn [result account-id {:keys [balance]}]
@@ -83,10 +96,33 @@
                     :account/id account-id
                     :account/balance balance}))
     []
-    state)})
+    (:accounts state))
+   :events (:events state)})
 
 (defn deserialize-kafka-message [bytes]
   (read-string (String. bytes "UTF-8")))
 
 (defn transaction? [event old new all-new]
   (contains? new :tx))
+
+(defn initialize-producer [event lifecycle]
+  (let [producer (g/producer (:kafka/brokers lifecycle))]
+    {:commander/producer producer}))
+
+(defn forward-events [event lifecycle]
+  (let [p (:commander/producer event)
+        events (->> (get-in event [:onyx.core/batch])
+                    (map :events)
+                    (reduce into []))]
+    (doseq [event events]
+      (g/send p (:commander/event-topic lifecycle) (pr-str event))))
+  {})
+
+(defn close-producer [event lifecycle]
+  (.close (:commander/producer event))
+  {})
+
+(def send-events
+  {:lifecycle/before-task-start initialize-producer
+   :lifecycle/after-batch forward-events
+   :lifecycle/after-task-stop close-producer})

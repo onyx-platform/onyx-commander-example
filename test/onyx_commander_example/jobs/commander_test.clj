@@ -30,6 +30,8 @@
 (defn now []
   (java.util.Date.))
 
+(def transaction-id (UUID/randomUUID))
+
 (def commands
   [{:command/id (UUID/randomUUID)
     :command/action :create-account
@@ -65,7 +67,7 @@
     :command.deposit-money/data {:account/to "123"
                                  :account/amount 70}}
 
-   {:command/id (UUID/randomUUID)
+   {:command/id transaction-id
     :command/action :transfer-money
     :command/timestamp (now)
     :command.transfer-money/data {:account/from "123"
@@ -90,7 +92,7 @@
 
   (with-open [p (g/producer brokers)]
     (let [command command-sequence]
-      (g/send p topic topic (pr-str command)))))
+      (g/send p topic (pr-str command)))))
 
 (defn create-datomic-db! [uri schema]
   (d/create-database uri)
@@ -114,6 +116,7 @@
   (testing "Test a sequence of commands"
     (let [datomic-uri (str "datomic:mem://" (java.util.UUID/randomUUID))
           datomic-conn (create-datomic-db! datomic-uri da/schema)
+          consumer (g/consumer kafka-brokers "onyx-consumer")
           tenancy-id (UUID/randomUUID)
           config (load-config "dev-config.edn")
           env-config (assoc (:env-config config) :onyx/tenancy-id tenancy-id)
@@ -121,13 +124,23 @@
           job {:workflow c/workflow
                :catalog (c/catalog kafka-zookeeper commands-topic datomic-uri)
                :flow-conditions c/flow-conditions
-               :lifecycles c/lifecycles
+               :lifecycles (c/lifecycles kafka-brokers events-topic)
                :windows c/windows
                :triggers c/triggers
                :task-scheduler :onyx.task-scheduler/balanced}]
+      (g/assign! consumer events-topic 0)
+      (g/seek-to! consumer :beginning events-topic 0)
       (with-test-env [test-env [3 env-config peer-config]]
-        (clojure.pprint/pprint (onyx.api/submit-job peer-config job))
-        (Thread/sleep 4000)
+        (onyx.api/submit-job peer-config job)
+        
+        (loop []
+          (let [records (map (comp read-string :value) (g/poll consumer))
+                parents (map :event/parent-id records)]
+            (when-not (some #{transaction-id} (into #{} parents))
+              (recur))))
+
         (let [db (d/db datomic-conn)]
-          (prn (d/pull db [:account/id :account/balance] [:account/id "123"]))
-          (prn (d/pull db [:account/id :account/balance] [:account/id "456"])))))))
+          (is (= 80 (:account/balance (d/pull db [:account/id :account/balance] [:account/id "123"]))))
+          (is (= 110 (:account/balance (d/pull db [:account/id :account/balance] [:account/id "456"])))))
+
+        (.close consumer)))))

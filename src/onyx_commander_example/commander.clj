@@ -37,12 +37,17 @@
     :flow/short-circuit? true
     :flow/predicate :onyx-commander-example.impl/transaction?}])
 
-(def lifecycles
+(defn lifecycles [brokers event-topic]
   [{:lifecycle/task :read-commands
     :lifecycle/calls :onyx.plugin.kafka/read-messages-calls}
 
    {:lifecycle/task :update-materialized-view
-    :lifecycle/calls :onyx.plugin.datomic/write-bulk-tx-async-calls}])
+    :lifecycle/calls :onyx.plugin.datomic/write-bulk-tx-async-calls}
+
+   {:lifecycle/task :update-materialized-view
+    :lifecycle/calls :onyx-commander-example.impl/send-events
+    :kafka/brokers brokers
+    :commander/event-topic event-topic}])
 
 (def windows
   [{:window/id :update-state
@@ -53,8 +58,8 @@
 (def triggers
   [{:trigger/id :flush-state
     :trigger/window-id :update-state
-    :trigger/refinement :onyx.refinements/accumulating
+    :trigger/refinement :onyx-commander-example.impl/discarding-events
     :trigger/on :onyx.triggers/segment
     :trigger/fire-all-extents? true
     :trigger/threshold [1 :element]
-    :trigger/emit :onyx-commander-example.impl/balances->segments}])
+    :trigger/emit :onyx-commander-example.impl/transform-window-state}])

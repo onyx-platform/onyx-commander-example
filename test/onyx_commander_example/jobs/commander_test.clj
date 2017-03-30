@@ -19,7 +19,7 @@
            [org.apache.kafka.common.errors UnknownTopicOrPartitionException]
            [kafka.common TopicAlreadyMarkedForDeletionException]))
 
-;; Change me if you're Docker IP is different.
+;; Change me if your Docker IP is different.
 (def docker-ip "127.0.0.1")
 
 (def kafka-zookeeper (format "%s:2181" docker-ip))

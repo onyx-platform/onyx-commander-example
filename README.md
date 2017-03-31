@@ -7,10 +7,10 @@ for the initial caller of a command.
 
 ### Usage
 
-- Spin up ZooKeeper and Kafka with Docker compose: `docker-compose -f docker-compose-single-broker.yml up`
+- Spin up ZooKeeper and Kafka with Docker compose: `docker-compose up`
 - Open the test under `onyx-commander-example/test/onyx_commander_example/jobs/commander_test.clj`
 - If your Docker IP isn't `127.0.0.1`, change the ZooKeeper and Kafka hosts at the top of the file
-- Run the test
+- Run the test with `lein test`
 
 ### Acknowledgments
 
